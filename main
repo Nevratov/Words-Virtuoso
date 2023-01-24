@@ -1,0 +1,199 @@
+package wordsvirtuoso
+
+import java.io.File
+import java.io.FileNotFoundException
+import kotlin.random.Random
+import kotlin.system.exitProcess
+
+fun main(args: Array<String>) {
+
+    input(args)
+}
+
+fun input(args: Array<String>) {
+    if (args.size != 2) {
+        println("Error: Wrong number of arguments.")
+        exitProcess(0)
+    }
+
+    val words: List<String>
+    try {  // Проверка первого аргумента на существование, и запись если он существет
+        words = File(args[0]).readLines()
+    } catch (e: FileNotFoundException) {
+        println("Error: The words file ${args[0]} doesn't exist.")
+        exitProcess(0)
+    }
+
+    val wordsCandidate: List<String>
+    try {
+        wordsCandidate = File(args[1]).readLines()
+    } catch (e: FileNotFoundException) {
+        println("Error: The candidate words file ${args[1]} doesn't exist.")
+        exitProcess(0)
+    }
+
+    check(words, wordsCandidate, args[0], args[1])
+}
+
+fun check(words: List<String>, wordsCandidate: List<String>, fileNameWords: String, fileNameWordsCandidate: String) {
+
+    val listWords = mutableListOf<String>()
+    val listWordsCandidate = mutableListOf<String>()
+
+    var invalidWords = 0
+    mainLoop@ for (word in words) {
+        word.trim() // wordWithNotSpaces
+        listWords.add(word.lowercase())
+
+        for (ch in word) {
+            if (ch !in 'A'..'Z' && ch !in 'a'..'z') {
+                invalidWords++
+                continue@mainLoop
+            }
+            if (word.count { it == ch } > 1) {
+                invalidWords++
+                continue@mainLoop
+            }
+        }
+
+        if (word.length != 5) {
+            invalidWords++
+            continue
+        }
+    }
+
+    if (invalidWords != 0) {
+        println("Error: $invalidWords invalid words were found in the $fileNameWords file.")
+        exitProcess(0)
+    }
+
+    var invalidWordsCandidate = 0
+    check1@for (word in wordsCandidate) {
+        word.trim() // wordWithNotSpaces
+        listWordsCandidate.add(word.lowercase())
+
+
+        for (ch in word) {
+            if (ch !in 'A'..'Z' && ch !in 'a'..'z') {
+                invalidWordsCandidate++
+                continue@check1
+            }
+            if (word.count { it == ch } > 1) {
+                invalidWordsCandidate++
+                continue@check1
+            }
+        }
+
+        if (word.length != 5) {
+            invalidWordsCandidate++
+            continue
+        }
+    }
+
+    if (invalidWordsCandidate != 0) {
+        println("Error: $invalidWordsCandidate invalid words were found in the $fileNameWordsCandidate file.")
+        exitProcess(0)
+    }
+
+    var wordsCandidateNotFound = 0
+    for (wordCandidate in listWordsCandidate) {
+        if (wordCandidate !in listWords) wordsCandidateNotFound++ else continue
+    }
+
+    if (wordsCandidateNotFound != 0) {
+        println("Error: $wordsCandidateNotFound candidate words are not included in the $fileNameWords file.")
+        exitProcess(0)
+    } else {
+        println("Words Virtuoso")
+        startGame(wordsCandidate, listWords)
+    }
+}
+var startTime: Long = 0 // Начало отсчёта времени игры
+fun startGame(wordsCandidate: List<String>, listWords: MutableList<String>) {
+    val secretWord = wordsCandidate[Random.nextInt(wordsCandidate.size)]
+    startTime = System.currentTimeMillis()
+    checkFailUserInput(secretWord, listWords)
+}
+
+
+
+var turns = 0
+fun checkFailUserInput(secretWord: String, listWords: MutableList<String>) {
+    turns++
+
+    println()
+    println("Input a 5-letter word:")
+    val userWord = readln().lowercase()
+
+    if (userWord == "exit") {
+        println("The game is over.")
+        exitProcess(0)
+    }
+
+    if (userWord == secretWord) {
+        val endTime = System.currentTimeMillis() // Конец отсчёта игры
+        if (turns == 1) {
+            println()
+            for (ch in secretWord) print("\u001B[48:5:10m$ch\u001B[0m")
+            println("\n\nCorrect!\nAmazing luck! The solution was found at once.")
+        }
+        else {
+            for (hint in allHints) println(hint)
+            println()
+            for (ch in secretWord) print("\u001B[48:5:10m$ch\u001B[0m")
+            println("\n\nCorrect!\nThe solution was found after $turns tries in ${(endTime-startTime)/1000} seconds.")
+        }
+
+        exitProcess(0)
+    } else if (userWord.length != 5) {
+        println("The input isn't a 5-letter word.")
+        checkFailUserInput(secretWord, listWords)
+    } else if (!isOnlyLetters(userWord)) {
+        println("One or more letters of the input aren't valid.")
+        checkFailUserInput(secretWord, listWords)
+    } else if  (!foundDuplicateLetter(userWord)) {
+        println("The input has duplicate letters.")
+        checkFailUserInput(secretWord, listWords)
+    } else if (userWord !in listWords) {
+        println("The input word isn't included in my words list.")
+        checkFailUserInput(secretWord, listWords)
+    }
+
+    generatingHint(secretWord, userWord, listWords)
+}
+
+val allHints = mutableListOf<String>()
+var wrongCharacters = mutableSetOf<String>()
+fun generatingHint(secretWord: String, userWord: String, listWords: MutableList<String>) {
+    var resultHint = ""
+    for (index in 0..4) {
+        if (secretWord[index] == userWord[index]) resultHint += "\u001B[48:5:10m${secretWord[index].uppercase()}\u001B[0m"
+        else if (userWord[index] in secretWord) resultHint += "\u001B[48:5:11m${userWord[index].uppercase()}\u001B[0m"
+        else {
+            wrongCharacters.add(userWord[index].uppercase())
+            resultHint += "\u001B[48:5:7m${userWord[index].uppercase()}\u001B[0m"
+        }
+    }
+    allHints.add(resultHint)
+    val wrongChFinal = wrongCharacters.sorted()
+    var wrongChFinal2 = ""
+    println()
+    for (hint in allHints) println(hint)
+    println()
+    for (ch in wrongChFinal) wrongChFinal2 += ch
+    print("\u001B[48:5:14m$wrongChFinal2\u001B[0m")
+    println()
+    checkFailUserInput(secretWord, listWords)
+}
+
+
+fun isOnlyLetters(userWord: String): Boolean {
+    val regex = "[a-z]+".toRegex()
+    return regex.matches(userWord)}
+
+fun foundDuplicateLetter(userWord: String): Boolean {
+    for (ch in userWord) {
+        if (userWord.count { it == ch } > 1) return false
+    }
+    return true
+}
